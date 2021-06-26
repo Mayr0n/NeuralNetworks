@@ -13,6 +13,25 @@ public class Layer {
         }
     }
 
+    @Override
+    public boolean equals(Object obj){
+        if(obj instanceof Layer){
+            return ((Layer) obj).getNeurons().containsAll(this.getNeurons());
+        }
+        return false;
+    }
+
+    @Override
+    public String toString(){
+        StringBuilder sb = new StringBuilder();
+        sb.append("--------------------\n");
+        for(Neuron n : this.neurons){
+            sb.append(n.toString()).append("\n");
+        }
+        sb.append("--------------------\n");
+        return sb.toString();
+    }
+
     public Layer(LinkedList<Neuron> neurons){
         this.neurons = neurons;
     }

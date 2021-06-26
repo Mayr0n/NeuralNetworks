@@ -159,4 +159,12 @@ public class Matrix {
         sb.deleteCharAt(sb.length()-1).append("]");
         return sb.toString();
     }
+
+    @Override
+    public boolean equals(Object obj){
+        if(obj instanceof Matrix){
+            return ((Matrix) obj).getMatrix().containsAll(this.getMatrix());
+        }
+        return false;
+    }
 }

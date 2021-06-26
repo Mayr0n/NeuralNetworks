@@ -1,37 +1,37 @@
 package xyz.neural;
 
-import xyz.neural.matrices.Matrix;
 import xyz.neural.parts.NeuralNetwork;
 
-import java.util.Arrays;
+import java.sql.SQLException;
 import java.util.LinkedList;
 import java.util.Random;
 
 public class Main {
 
     public static void main(String[] args) {
+        try {
+            SQLManager.setup("neural.db");
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        }
+
+
         LinkedList<Integer> compo = new LinkedList<>();
         compo.add(2);
-        compo.add(3);
+        compo.add(4);
+        compo.add(2);
         compo.add(1);
-        NeuralNetwork nn = new NeuralNetwork(compo, 2);
+        NeuralNetwork nn = new NeuralNetwork(compo, 4);
+        nn.save("test");
+        NeuralNetwork nn2 = NeuralNetwork.load("test");
 
-        int nbEssais = 10000;
+        LinkedList<Float> entries = new LinkedList<>();
+        entries.add(0.4f);
+        entries.add(0.1f);
+        entries.add(0.5f);
+        entries.add(0.9f);
 
-        for(int i = 0 ; i < nbEssais ; i++) {
-            LinkedList<Float> entries = new LinkedList<>();
-            entries.add(new Random().nextFloat());
-            entries.add(new Random().nextFloat());
-
-            LinkedList<Float> targets = new LinkedList<>();
-            float x = entries.get(0);
-            float y = entries.get(1);
-            targets.add(x*y/(x+y));
-
-            nn.train(entries, targets, nbEssais);
-            System.out.println("Expected : " + targets.get(0));
-            System.out.println("Got : " + nn.feedForward(entries));
-
-        }
+        System.out.println(nn.feedForward(entries));
+        System.out.println(nn2.feedForward(entries));
     }
 }

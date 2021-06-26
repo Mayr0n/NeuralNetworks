@@ -11,7 +11,7 @@ public class Neuron {
     private Matrix weights;
     private float bias = 1;
     private Function<Float, Float> function = x -> 1/(1+(float) Math.exp(-x));
-    private Function<Float, Float> derivative = x -> (float) -Math.exp(-x)/(float) Math.pow(Math.exp(-x) + 1, 2);
+    private Function<Float, Float> derivative = x -> (float) Math.exp(-x)/(float) Math.pow(Math.exp(-x) + 1, 2);
 
     public Neuron(LinkedList<Float> weights, Function<Float, Float> func, Function<Float, Float> dfunc){
         this.weights = Matrix.vectorialize(weights);
@@ -31,6 +31,23 @@ public class Neuron {
             this.function = func;
             this.derivative = dfunc;
         }
+    }
+
+    @Override
+    public boolean equals(Object obj){
+        if(obj instanceof Neuron){
+            return ((Neuron) obj).getWeights().equals(this.getWeights());
+        }
+        return false;
+    }
+
+    @Override
+    public String toString(){
+        StringBuilder sb = new StringBuilder();
+        for(int i = 0 ; i < this.weights.getNumberLines() ; i++){
+            sb.append(this.weights.getElement(0, i)).append("\n");
+        }
+        return sb.toString();
     }
 
     public float getWeight(int index){
