@@ -8,7 +8,7 @@ import java.util.LinkedList;
 
 public class NeuralNetwork {
     private LinkedList<Layer> layers = new LinkedList<>();
-    private final float learningRate = 1f;
+    public final float learningRate = 1f;
 
     public NeuralNetwork(LinkedList<Integer> compo, int nbEntries){
         for(int i = 0 ; i < compo.size() ; i++){
