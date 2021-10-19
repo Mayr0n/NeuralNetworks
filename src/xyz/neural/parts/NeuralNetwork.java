@@ -1,167 +1,62 @@
 package xyz.neural.parts;
 
-import xyz.neural.SQLManager;
-import xyz.neural.matrices.Matrix;
+import com.sun.java.accessibility.util.Translator;
+import xyz.neural.Forminator;
+import xyz.neural.PatternManager;
+import xyz.neural.matrices.Vector;
 
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
+import java.io.*;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class NeuralNetwork {
-    private LinkedList<Layer> layers = new LinkedList<>();
     public float learningRate = 1f;
+    public float inertie = 0.5f;
+    private LinkedList<Layer> layers = new LinkedList<>();
 
-    public NeuralNetwork(LinkedList<Integer> compo, int nbEntries){
-        for(int i = 0 ; i < compo.size() ; i++){
-            if(i == 0){
+    public NeuralNetwork(LinkedList<Integer> compo, int nbEntries) {
+        for (int i = 0; i < compo.size(); i++) {
+            if (i == 0) {
                 this.layers.add(new Layer(nbEntries, compo.get(i)));
             } else {
-                this.layers.add(new Layer(this.layers.get(i-1).size(), compo.get(i)));
+                this.layers.add(new Layer(this.layers.get(i - 1).size(), compo.get(i)));
             }
         }
     }
 
-    public static void delete(String name){
-        LinkedHashMap<String, Object> search = new LinkedHashMap<>();
-        search.put("id", 0);
-        LinkedList<LinkedList<Object>> results = SQLManager.get(search, "neural", "name=\""+ name + "\"");
-        assert results.size() == 1;
-
-        int neuralID = getID("neural", "name=\"" + name + "\"");
-        search.clear();
-        search.put("id", 0);
-        results = SQLManager.get(search, "layers", "network=" + neuralID);
-        LinkedList<Integer> layersIDs = new LinkedList<>();
-        for(LinkedList<Object> lay : results){
-            layersIDs.add((int) lay.get(0));
-        }
-        for(int layerID: layersIDs){
-            LinkedList<Integer> neuronsIDs = new LinkedList<>();
-            results = SQLManager.get(search, "neurons", "layer=" + layerID);
-            for(LinkedList<Object> neuro : results){
-                neuronsIDs.add((int) neuro.get(0));
-            }
-            for(int neuronID : neuronsIDs){
-                SQLManager.delete("weights", "neuron=" + neuronID);
-            }
-            SQLManager.delete("neurons", "layer=" + layerID);
-        }
-        SQLManager.delete("layers", "network=" + neuralID);
-        SQLManager.delete("neural", "name=\"" + name + "\"");
-    }
-    public static NeuralNetwork load(String name){
-        LinkedHashMap<String, Object> search = new LinkedHashMap<>();
-        search.put("id", 0);
-        LinkedList<LinkedList<Object>> results = SQLManager.get(search, "neural", "name=\""+ name + "\"");
-        assert results.size() == 1;
-
-        LinkedList<Layer> layers = new LinkedList<>();
-
-        search.clear();
-        search.put("id", 0);
-        results = SQLManager.get(search, "layers", "network=" + getID("neural", "name=\"" + name + "\"") + " ORDER BY i");
-        LinkedList<Integer> layersIDs = new LinkedList<>();
-        for(LinkedList<Object> lay : results){
-            layersIDs.add((int) lay.get(0));
-        }
-        for(int layerID: layersIDs){
-            LinkedList<Integer> neuronsIDs = new LinkedList<>();
-            results = SQLManager.get(search, "neurons", "layer=" + layerID + " ORDER BY i");
-            for(LinkedList<Object> neuro : results){
-                neuronsIDs.add((int) neuro.get(0));
-            }
-            LinkedList<Neuron> neurons = new LinkedList<>();
-            for(int neuronID : neuronsIDs){
+    public static NeuralNetwork load(File file) throws IOException {
+        BufferedReader br = new BufferedReader(new FileReader(file));
+        List<String> lines = br.lines().collect(Collectors.toList()); // ordre ?
+        LinkedList<Layer> nne = new LinkedList<>();
+        for (String line : lines) {
+            LinkedList<Neuron> la = new LinkedList<>();
+            for (String neu : line.split(" \\| ")) {
+                float bias = Float.parseFloat(neu.split("/")[1]);
                 LinkedList<Float> weights = new LinkedList<>();
-                LinkedHashMap<String, Object> search2 = new LinkedHashMap<>();
-                search2.put("value", 0f);
-
-                results = SQLManager.get(search2, "weights", "neuron=" + neuronID + " ORDER BY i");
-                for(LinkedList<Object> weight : results){
-                    weights.add((float) weight.get(0));
+                for (String we : neu.split(" / ")[0].split(" ")) {
+                    if(!we.equals(" ")) weights.add(Float.parseFloat(we));
                 }
-                Neuron neuron = new Neuron(weights, null, null);
-                neurons.add(neuron);
+                la.add(new Neuron(weights, bias, null, null));
             }
-            layers.add(new Layer(neurons));
+            nne.add(new Layer(la));
         }
-        return new NeuralNetwork(layers);
-    }
-    public boolean save(String name){
-        LinkedHashMap<String, Object> search = new LinkedHashMap<>();
-        search.put("id", 0);
-        LinkedList<LinkedList<Object>> results = SQLManager.get(search, "neural", "name=\""+ name + "\"");
-        boolean exist = results.size() >= 1;
-        LinkedHashMap<String, Object> input = new LinkedHashMap<>();
-        if(!exist){
-            input.put("name", name);
-            SQLManager.insert(input, "neural");
-        }
-        int id = getID("neural", "name=\""+ name + "\"");
-        for(int l = 0 ; l < this.size() ; l++){ // size | ID + valeur | table |
-            if(!exist) insert("layers", "network", id, l);
-            int layerID = getID("layers", "network=" + id + " AND i=" + l);
-            for(int n = 0 ; n < this.layers.get(l).size() ; n++){
-                if(!exist)  insert("neurons", "layer", layerID, n);
-                int neuronID = getID( "neurons", "layer=" + layerID + " AND i=" + n);
-                Neuron neuron = this.layers.get(l).getNeuron(n);
-                for(int w = 0 ; w < neuron.getWeights().getNumberLines() ; w++){
-                    input.clear();
-                    if(!exist) {
-                        input.put("neuron", neuronID);
-                        input.put("i", w);
-                        input.put("value", neuron.getWeight(w));
-                        SQLManager.insert(input, "weights");
-                    } else {
-                        input.put("value", neuron.getWeight(w));
-                        SQLManager.update(input, "weights", "neuron=" + neuronID + " AND i=" + w);
-                    }
-                }
-            }
-        }
-        return exist;
+        return new NeuralNetwork(nne);
     }
 
-    private static int getID(String table, String condition){
-        LinkedHashMap<String, Object> search = new LinkedHashMap<>();
-        search.put("id", 0);
-        return (int) SQLManager.get(search, table, condition).get(0).get(0);
-    }
-
-    private void insert(String table, String idS, int id, int index){
-        LinkedHashMap<String, Object> input = new LinkedHashMap<>();
-        input.put(idS, id);
-        input.put("i", index);
-        SQLManager.insert(input, table);
-    }
-
-    public NeuralNetwork(LinkedList<Layer> compo){
+    public NeuralNetwork(LinkedList<Layer> compo) {
         this.layers = compo;
     }
 
     @Override
-    public boolean equals(Object obj){
-        if(obj instanceof NeuralNetwork){
-            return ((NeuralNetwork) obj).getLayers().containsAll(this.getLayers());
-        }
+    public boolean equals(Object obj) {
         return false;
     }
 
-    @Override
-    public String toString(){
-        StringBuilder sb = new StringBuilder();
-        sb.append("^^^^^^^^^^^^^^^^^^^^^^^^\n");
-        for(Layer l : this.layers){
-            sb.append(l.toString()).append("\n");
-        }
-        sb.append("vvvvvvvvvvvvvvvvvvvvvvvvv\n");
-        return sb.toString();
-    }
-
-    public Layer getLayer(int i){
+    public Layer getLayer(int i) {
         return this.layers.get(i);
     }
 
-    public Neuron getNeuron(int x, int y){
+    public Neuron getNeuron(int x, int y) {
         return this.layers.get(x).getNeuron(y);
     }
 
@@ -169,111 +64,186 @@ public class NeuralNetwork {
         return layers;
     }
 
-    public int size(){
+    public int size() {
         return this.layers.size();
     }
 
-    public Matrix feedForward(LinkedList<Float> entries){
-        return this.getFeedResults(Matrix.vectorialize(entries)).getLast();
+    public Vector feedForward(LinkedList<Float> entries) {
+        return this.getFeedResults(Vector.vectorialize(entries)).getLast();
     }
 
-    public Matrix feedForward(Matrix entries){
+    public Vector feedForward(Vector entries) {
         return this.getFeedResults(entries).getLast();
     }
 
-    public LinkedList<Matrix> getFeedResults(Matrix ents){ // permet de récupérer tous les a
-        assert ents.getNumberLines() == this.layers.get(0).getNeuron(0).getWeights().getNumberLines();
-        LinkedList<Matrix> results = new LinkedList<>();
+    public LinkedList<Vector> getFeedResults(Vector ents) { // permet de récupérer tous les a : sorties des neurones
+        assert ents.size() == this.layers.get(0).getNeuron(0).getWeights().size();
+        LinkedList<Vector> results = new LinkedList<>();
         results.add(this.layers.get(0).feedForward(ents));
-        for(int i = 1 ; i < this.size(); i++){
-            results.add(this.layers.get(i).feedForward(results.get(i-1)));
+        for (int i = 1; i < this.size(); i++) {
+            results.add(this.layers.get(i).feedForward(results.get(i - 1)));
         }
         return results;
     }
 
-    public LinkedList<Matrix> getWeightedSums(Matrix ents){ // permet de récupérer tous les z
-        LinkedList<Matrix> results = new LinkedList<>();
+    public LinkedList<Vector> getWeightedSums(Vector ents) { // permet de récupérer tous les z : sommes pondérées
+        assert ents.size() == this.layers.get(0).getNeuron(0).getWeights().size();
+        LinkedList<Vector> results = new LinkedList<>();
         results.add(this.layers.get(0).sumForward(ents));
-        for(int i = 1 ; i < this.size(); i++){
-            results.add(this.layers.get(i).feedForward(results.get(i-1)));
+        for (int i = 1; i < this.size(); i++) {
+            results.add(this.layers.get(i).sumForward(results.get(i - 1)));
         }
         return results;
     }
 
-    public float cost(LinkedList<Float> entries, Matrix targets, int nbSamples){
-        Matrix els = Matrix.add(this.feedForward(entries), Matrix.multiply(-1, targets));
-        float sum = 0;
-        for(float el : els.getColumn(0)){
-            sum += el * el;
-        }
-        return sum/nbSamples;
+    public float cost(Vector entries, Vector targets) {
+        Vector els = Vector.substract(this.feedForward(entries), targets);
+        return Vector.hadamard(els, els).sum() / els.getNumberLines();
     }
 
-    public float dcost(Matrix entries, Matrix targets, int index){
-        Matrix results = this.feedForward(entries);
-        return 2/(float) results.getNumberLines() * (results.getElement(0, index) - targets.getElement(0, index));
+    public Vector dcost(Vector y, Vector t) {
+        return Vector.substract(y, t).multiply(2);
     }
 
-    public void train(LinkedList<Float> entries, LinkedList<Float> targets){
-        Matrix ents = Matrix.vectorialize(entries);
-        Matrix tgs = Matrix.vectorialize(targets);
+    private Vector getRandomKey(Hashtable<Vector, Vector> pattern) {
+        LinkedList<Vector> keys = new LinkedList<>(pattern.keySet());
+        return keys.get(new Random().nextInt(keys.size()));
+    }
 
-        LinkedList<Matrix> aS = this.getFeedResults(ents);
-        LinkedList<Matrix> zS = this.getWeightedSums(ents);
-        // liste de vecteurs, un vecteur = une layer
-        LinkedList<Matrix> deltas = new LinkedList<>();
-        // permet d'initialiser la liste de deltas pour pouvoir manipuler les indices tranquillement
-        for(int i = 0 ; i < this.size() ; i++){
-            deltas.add(new Matrix(this.getLayer(i).size(), 1));
-        }
-
-        // commencement de la rétropropagation en commençant par la dernière couche, puis en remontant
-        for(int l = this.size() - 1 ; l >= 0 ; l--){
-            Layer layer = this.getLayer(l); // couche actuelle
-            Matrix deltal = new Matrix(layer.size(), 1); // vecteur delta associé à la couche actuelle
-            for(int i = 0 ; i < layer.size() ; i++){ // pour chaque neurone de la couche
-                Neuron neuron = layer.getNeuron(i); // neurone actuel
-                float delta = neuron.dfunc(zS.get(l).getElement(0, i));
-                // disjonction de cas si on est sur la dernière couche ou non
-                if(l != this.size() - 1) {
-                    // somme pondérée des erreurs de la couche d'après
-                    Matrix weights = new Matrix(this.getLayer(l + 1).size(), 1);
-
-                    for (int n2 = 0; n2 < this.getLayer(l + 1).size(); n2++) { // tous les neurones de la couche d'après
-                        Neuron neuron2 = this.getLayer(l + 1).getNeuron(n2);
-                        // récupère le poids relié au neurone de la couche d'après (n2) au neurone actuel (n)
-                        weights.setElement(0, n2, neuron2.getWeight(i));
-                    }
-                    delta *= Matrix.scalaire(weights, deltas.get(l + 1));
-                } else {
-                    // si dernière couche, on n'utilise pas l'erreur des neurones de la couche suivante mais
-                    // on utilise la dérivée de la fonction de cout
-                    delta *= this.dcost(ents, tgs, i);
-                }
-                deltal.setElement(0, i, delta);
+    public void startOnlineTrainingProgram(PatternManager t, int nb, boolean counter, boolean debugger) {
+        System.out.println("Début de l'entrainement...");
+        LinkedList<LinkedList<Vector>> deltaWIJL = new LinkedList<>();
+        for (int l = 0; l < this.size(); l++) {
+            LinkedList<Vector> li = new LinkedList<>();
+            for(int n = 0 ; n < this.getLayer(l).size() ; n++){
+                Neuron ne = this.getLayer(l).getNeuron(n);
+                li.add(Vector.addVector(ne.getWeights(), ne.getWeights().multiply(-1)));
             }
-            deltas.set(l, deltal);
+            deltaWIJL.add(li);
         }
 
-        // changement de tous les poids
-        for(int l = 0; l < this.size() ; l++){ // défile toutes les couches
-            Layer layer = this.getLayer(l); // couche actuelle
-            for(int i = 0 ; i < layer.size() ; i++){ // défile tous les neurones de la couche actuelle
-                Neuron neuron = layer.getNeuron(i); // neurone actuel
-                float deltali = deltas.get(l).getElement(0, i); // delta du neurone actuel
-                for(int j = 0 ; j < neuron.getWeights().getNumberLines() ; j++){ // défile tous les poids du neurone
-                    float currentWeight = neuron.getWeight(j); // poids avant modification
-                    float alj;
-                    if(l == 0){
-                        alj = ents.getElement(0, j);
-                    } else {
-                        alj = aS.get(l - 1).getElement(0, j); // resultat du neurone de la couche précédente lié au poids
-                    }
-                    // indiçage incorrect
-                    neuron.setWeight(j, currentWeight - this.learningRate * alj * deltali);
+        for (int i = 1; i <= nb; i++) {
+            if(counter) System.out.println(i);
+            Vector key = t.getRandomKey();
+            LinkedList<Vector> deltaWeights = train(key, t.getPattern().get(key), debugger);
+
+            //deltaWIJL = LinkedList<LinkedList<Vector>>
+            for (int l = 0; l < this.size(); l++) {
+                LinkedList<Vector> li = deltaWIJL.get(l);
+                for(int n = 0 ; n < this.getLayer(l).size() ; n++){
+                    Neuron ne = this.getLayer(l).getNeuron(n);
+                    li.set(n, Vector.addVector(li.get(n), ne.getWeights().multiply(-1)));
                 }
+                deltaWIJL.set(l, li);
+            }
+
+            this.changeWeights(key, deltaWeights, deltaWIJL);
+            if(debugger) {
+                System.out.println("Obtenu : " + this.feedForward(key));
+                System.out.println("Voulu : " + t.getPattern().get(key));
+            }
+        }
+        System.out.println("Entrainement terminé.");
+    }
+
+    public int test(boolean debugger){
+        Forminator t = new Forminator();
+        int nb = 0;
+        for(int i = 0 ; i < 100 ; i++){
+            Vector key = t.getRandomKey();
+            float c = cost(key, t.getPattern().get(key));
+            if(c < 0.01){
+                nb++;
+            }
+            if(debugger){
+                System.out.println("Théorie : " + t.getPattern().get(key));
+                System.out.println("Obtenu : " + this.feedForward(key));
+            }
+        }
+        return nb;
+    }
+
+    public void save(String path) {
+        File file = new File(path);
+        try (FileWriter fw = new FileWriter(file)) {
+            StringBuilder sb = new StringBuilder();
+            for (Layer l : this.layers) {
+                sb.append("\n");
+                for (Neuron n : l.getNeurons()) {
+                    sb.append("{");
+                    for (float w : n.getWeights().getColumn(0)) {
+                        sb.append(w).append(" ");
+                    }
+                    sb.deleteCharAt(sb.length() - 1).append("} ");
+                }
+            }
+            fw.write(sb.toString());
+        } catch (IOException ignored) {
+        }
+    }
+
+    public LinkedList<Vector> train(Vector entries, Vector targets, boolean debugger) {
+        LinkedList<Vector> aS = this.getFeedResults(entries);
+        LinkedList<Vector> zS = this.getWeightedSums(entries);
+
+        LinkedList<Vector> deltas = new LinkedList<>();
+        for (int i = 0; i < this.size(); i++) {
+            deltas.add(new Vector(this.getLayer(i).size()));
+        }
+
+        for (int l = this.size() - 1; l >= 0; l--) {
+            Layer layer = this.getLayer(l);
+            Vector deltalv = layer.vectorialDsigmoid(zS.get(l));
+            if(debugger) System.out.println(deltalv);
+
+            if (l == this.size() - 1) {
+                deltas.set(l, Vector.hadamard(deltalv, this.dcost(aS.getLast(), targets)));
+            } else {
+                LinkedList<Float> ws = new LinkedList<>();
+                for (int i = 0; i < layer.size(); i++) {
+                    ws.add(Vector.scalaire(this.layers.get(l + 1).getWeightsConnected(i), deltas.get(l + 1)));
+                }
+                deltas.set(l, Vector.hadamard(deltalv, Vector.vectorialize(ws)));
+            }
+        }
+        return deltas;
+    }
+
+    public void changeWeights(Vector ents, LinkedList<Vector> deltas, LinkedList<LinkedList<Vector>> deltaWIJL) { // rappel : 1 delta = 1 neurone
+        LinkedList<Vector> aS = this.getFeedResults(ents);
+
+        for (int l = 0; l < this.size(); l++) { // défile toutes les couches
+            Layer layer = this.getLayer(l); // couche actuelle
+            for (int i = 0; i < layer.size(); i++) { // défile tous les neurones de la couche actuelle
+                Neuron neuron = layer.getNeuron(i); // neurone actuel
+                float deltali = deltas.get(l).get(i); // delta du neurone actuel
+                Vector deltaW;
+                if (l == 0) {
+                    deltaW = ents.multiply(this.learningRate * deltali);
+                } else {
+                    deltaW = aS.get(l - 1).multiply(this.learningRate * deltali);
+                }
+                deltaW = Vector.addVector(deltaW, deltaWIJL.get(l).get(i).multiply(1-this.inertie));
+                neuron.setWeights(Vector.substract(neuron.getWeights(), deltaW));
                 neuron.setBias(neuron.getBias() - this.learningRate * deltali);
             }
         }
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        for (Layer l : this.getLayers()) {
+            sb.append("--------------------------------------\n");
+            for (Neuron n : l.getNeurons()) {
+                sb.append("{");
+                for (int w = 0; w < n.getWeights().getNumberLines(); w++) {
+                    sb.append(n.getWeight(w)).append(",\n");
+                }
+                sb.append("}\n");
+            }
+            sb.append("--------------------------------------\n\n");
+        }
+        return sb.toString();
     }
 }

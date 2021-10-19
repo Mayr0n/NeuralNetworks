@@ -2,36 +2,21 @@ package xyz.neural;
 
 import xyz.neural.parts.NeuralNetwork;
 
-import java.sql.SQLException;
 import java.util.LinkedList;
-import java.util.Random;
 
 public class Main {
 
     public static void main(String[] args) {
-        try {
-            SQLManager.setup("neural.db");
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
-        }
-
-
         LinkedList<Integer> compo = new LinkedList<>();
-        compo.add(2);
-        compo.add(4);
-        compo.add(2);
-        compo.add(1);
-        NeuralNetwork nn = new NeuralNetwork(compo, 4);
-        nn.save("test");
-        NeuralNetwork nn2 = NeuralNetwork.load("test");
+        compo.add(3);
 
-        LinkedList<Float> entries = new LinkedList<>();
-        entries.add(0.4f);
-        entries.add(0.1f);
-        entries.add(0.5f);
-        entries.add(0.9f);
+        NeuralNetwork nn = new NeuralNetwork(compo, 64);
+        nn.learningRate = 0.1f;
+        nn.inertie = 0;
+        System.out.println("Pré-entraînement :" + nn.test(false) + "% de réussite");
+        nn.startOnlineTrainingProgram(new Forminator(), 100000, true, false);
+        System.out.println("Post-entraînement :" + nn.test(true) + "% de réussite");
+        nn.save("wtf.txt");
 
-        System.out.println(nn.feedForward(entries));
-        System.out.println(nn2.feedForward(entries));
     }
 }

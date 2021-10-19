@@ -1,0 +1,44 @@
+public LinkedList<Vector> train(Vector entries, Vector targets) {
+        LinkedList<Vector> aS = this.getFeedResults(entries);
+        LinkedList<Vector> zS = this.getWeightedSums(entries);
+
+        LinkedList<Vector> deltas = new LinkedList<>(); // 1 delta = 1 neurone, sera return
+        // permet d'initialiser la liste de deltas pour pouvoir manipuler les indices à l'envers
+        for (int i = 0; i < this.size(); i++) {
+            deltas.add(new Vector(this.getLayer(i).size()));
+        }
+
+        // commencement de la rétropropagation en commençant par la dernière couche, puis en remontant
+        for (int l = this.size() - 1; l >= 0; l--) {
+            Layer layer = this.getLayer(l); // couche actuelle
+                /*
+                    On cherche à calculer l'erreur liée à chaque neurone.
+                    Pour cela, il y a une distinction de cas à faire :
+                        Si on se situe sur la dernière couche :
+                            δ = dsigma(Z)*dcost(A)
+                            où Z est la somme pondérée entrant dans le neurone,
+                            et A la sortie de celui-ci.
+                        Si on se situe sur une couche antérieure :
+                             δ = dsigma(z)*Σ(w^l+1*δ^l+1)
+                             où z est la somme pondérée entrant dans le neurone,
+                             et Σ(w^l+1*δ^l+1) la somme pondérée des erreurs de la couche suivante
+                             par les poids reliant le neurone actuel à ceux de la couche suivante.
+
+                 */
+
+            Vector deltalv = layer.vectorialDsigmoid(zS.get(l));
+            // vecteur qui, pour chaque neurone, contient dsigma(z) à chaque coordonnées
+            // pour juste devoir faire un produit de hadamard avec la disjonction de cas
+
+            if (l == this.size() - 1) {
+                deltas.set(l, Vector.hadamard(deltalv, this.dcost(aS.getLast(), targets)));
+            } else {
+                LinkedList<Float> ws = new LinkedList<>();
+                for (int i = 0; i < layer.size(); i++) {
+                    ws.add(Vector.scalaire(this.layers.get(l + 1).getWeightsConnected(i), deltas.get(l + 1)));
+                }
+                deltas.set(l, Vector.hadamard(deltalv, Vector.vectorialize(ws)));
+            }
+        }
+        return deltas;
+    }

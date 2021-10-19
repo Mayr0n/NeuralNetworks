@@ -70,27 +70,6 @@ public class Matrix {
         return this.matrix.size();
     }
 
-    public static Matrix hadamard(Matrix m1, Matrix m2){
-        assert m1.getNumberColumns() == m2.getNumberColumns() && m1.getNumberColumns() == 1
-                && m1.getNumberLines() == m2.getNumberLines();
-        Matrix m3 = new Matrix(m1.getNumberLines(), 1);
-        for(int i = 0 ; i < m1.getNumberLines() ; i++){
-            m3.setElement(0, i, m1.getElement(0, i) * m2.getElement(0, i));
-        }
-        return m3;
-    }
-
-    public static float scalaire(Matrix v1, Matrix v2){
-        assert v1.getNumberColumns() == v2.getNumberColumns() && v1.getNumberColumns() == 1
-                && v1.getNumberLines() == v2.getNumberLines();
-        Matrix v3 = Matrix.hadamard(v1, v2);
-        float sum = 0;
-        for(int i = 0 ; i < v3.getNumberLines() ; i++){
-            sum += v3.getElement(0, i);
-        }
-        return sum;
-    }
-
     public static Matrix multiply(Matrix m1, Matrix m2){
         assert m1.getNumberColumns() == m2.getNumberLines();
         Matrix m3 = new Matrix(m1.getNumberColumns(), m2.getNumberLines());
@@ -135,14 +114,6 @@ public class Matrix {
             s += f;
         }
         return s;
-    }
-
-    public static Matrix vectorialize(LinkedList<Float> elements){
-        Matrix m = new Matrix(elements.size(), 1);
-        for(int i = 0; i < elements.size() ; i++){
-            m.setElement(0, i, elements.get(i));
-        }
-        return m;
     }
 
     public String toString(){
